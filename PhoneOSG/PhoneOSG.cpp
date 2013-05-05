@@ -135,8 +135,8 @@ public:
 			}
 			return true;
 		default:
-			cout << ea.getEventType() << endl;
-			cout << osgGA::GUIEventAdapter::USER << endl;
+			//cout << ea.getEventType() << endl;
+			//cout << osgGA::GUIEventAdapter::USER << endl;
 			break;
 		}
 		return false;
@@ -156,13 +156,13 @@ int _tmain(int argc, char** argv)
 	}
 
 	boost::thread thrd(boost::bind(&PhoneInput::start, (PhoneInput::instance())));
-	thrd.detach();  
-	//需要这一步
+	thrd.detach();  //需要这一步
+	
 
 	MDEViewer viewer;
 	viewer.setUpViewInWindow( 250, 50, 800, 600 );
 	viewer.setSceneData( model );
-	//viewer.addEventHandler( new PhoneHandler );
+	viewer.addEventHandler( new PhoneHandler );
 	viewer.setCameraManipulator(new osgGA::TrackballManipulator());
 	PhoneInput::instance()->init(viewer);
 	//viewer.addEventHandler( new JoystickHandler );

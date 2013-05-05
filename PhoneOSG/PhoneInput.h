@@ -7,15 +7,18 @@
 #include <osg/GraphicsContext>
 #include <osgViewer/Viewer>
 #include <osgViewer/CompositeViewer>
+#include <boost/property_tree/ptree.hpp>
+#include <boost/property_tree/json_parser.hpp>
+#include <boost/date_time.hpp>
 #include <string>
 #include <queue>
+#include <set>
 
+using std::set;
 using std::queue;
 using std::string;
 using boost::asio::ip::tcp;
-
-static queue<string> g_inputMsg;    //输入信息
-static queue<string> g_outputMsg;   //输出信息
+using namespace boost::property_tree;
 
 enum MSGType
 {
@@ -41,6 +44,7 @@ enum MSGType
 	NAVMANIPULATOR1			= 19,
 	//多指消息
 };
+
 //触点阶段
 enum TouchPhase 
 {
@@ -50,6 +54,7 @@ enum TouchPhase
 	TOUCH_STATIONERY,
 	TOUCH_ENDED
 };
+
 //触点结构
 struct TouchPoint
 {
@@ -57,21 +62,25 @@ struct TouchPoint
 	TouchPhase phase;         //阶段
 	float x, y;               //坐标
 };
+
 //加速度计
 struct Accelerometers
 {	
 	float _ax, _ay, _az;
 };
+
 //陀螺仪
 struct Gyroscope
 {
 	float gx, gy, gz;
 };
+
 //磁力计
 struct Magnetometers
 {
 	float _mx, _my, _mz;
 };
+
 //虚拟角度
 struct Rotational
 {
@@ -137,14 +146,17 @@ private:
 	std::vector<osg::ref_ptr<osgGA::CameraManipulator>> _Manipulators;
 	std::map<string,Controller*> IDandControllermaps;
 
+	queue<ptree> m_controlMsg;  //只包含断开连接，新连接，请求控制和放弃控制等
+	queue<ptree> m_inputMsg;    //输入信息,不包括连接，申请放弃控制权的消息
+	queue<ptree> m_outputMsg;   //输出信息
 
-	//boost::asio::io_service io_service;
-	//boost::asio::ip::tcp::endpoint ep;
-	//boost::asio::ip::tcp::acceptor acceptor;
-	//tcp::iostream m_socketStream;
+	int m_nMainPhoneID;         //主相机ID,如果没人控制，那么初始化为0，如果要申请控制，则需要检查该标志
+	
+	//所有的相机ID，编号从0开始的整数，如果需要有新的连接，判断是否已经有连接
+	//如果需要删除相机，也需要判断是否还存在该相机
+	//在插入操作消息之前，需要先检查该手机是否连接上
+	set<int> m_nsetPhoneIDs;
 };
-
-
 
 #endif
 

@@ -5,3 +5,17 @@
 *.vcxproj
 *.user
 *.filters
+*.tlog
+*.exe
+*.ilk
+*.pdb
+*.obj
+*.manifest
+*.res
+*.lastbuildstate
+*.log
+*.pch
+*.rc
+*.idb
+*.cache
+*.suo

@@ -1,7 +1,4 @@
 #include "stdafx.h"
-#include <boost/property_tree/ptree.hpp>
-#include <boost/property_tree/json_parser.hpp>
-#include <boost/date_time.hpp>
 #include <boost/thread/condition_variable.hpp> 
 
 #include "PhoneInput.h"
@@ -43,7 +40,7 @@ bool PhoneInput::init(osgViewer::Viewer &viewer )
 		//视景器缺省相机和操作器为第一个,
 		defaultController._Cameras = _viewer->getCamera();
 		defaultController._Manipulator = _viewer->getCameraManipulator();
-		
+
 		osg::Image* image = new osg::Image;
 		osg::Viewport* a = defaultController._Cameras->getViewport();
 		image->allocateImage(a->width(),a->height() , 1, GL_RGBA, GL_UNSIGNED_BYTE);
@@ -65,51 +62,59 @@ bool PhoneInput::init(osgViewer::Viewer &viewer )
 
 void PhoneInput::updateViewer(osgViewer::Viewer &viewer)
 {
-	cout << "updateViewer \n" << zfj <<endl;
-	zfj++;
+	//cout << "updateViewer \n" << zfj <<endl;
+	//zfj++;
 	/*获取
 	NEWCONNECT				=  1,     //新连接
 	DISCONNECT				=  2,     //断开连接
 	GIVEUPCONTROL 			=  3,     //放弃控制
 	REQUESTCONTROL			=  4,     //请求控制
 	这四类消息,对视景器添加\移除相机\切换主相机等*/
-	int msgType = 0;
-	switch(msgType)
 	{
-	case NEWCONNECT:
-		cout << "NEWCONNECT" << endl;
-		break;
-	case DISCONNECT:
-		cout << "DISCONNECT" << endl;
-		break;
-	case GIVEUPCONTROL:
-		cout << "GIVEUPCONTROL" << endl;
-		break;
-	case REQUESTCONTROL:
-		cout << "REQUESTCONTROL" << endl;
-		break;
-	default:
-		cout << "user Event\n" << endl;
-		break;
+		boost::unique_lock<boost::mutex> lock(g_mutex);
+		while(!m_controlMsg.empty())
+		{
+			ptree pt;
+
+			pt = m_controlMsg.front();
+			m_controlMsg.pop();
+
+			int msgType = atoi(pt.get<string>("msgType").c_str());
+			switch(msgType)
+			{
+			case NEWCONNECT:
+				cout << "NEWCONNECT" << endl;
+				break;
+			case DISCONNECT:
+				cout << "DISCONNECT" << endl;
+				break;
+			case GIVEUPCONTROL:
+				cout << "GIVEUPCONTROL" << endl;
+				break;
+			case REQUESTCONTROL:
+				cout << "REQUESTCONTROL" << endl;
+				break;
+			default:
+				cout << "user Event\n" << endl;
+				break;
+			}
+		}
+
 	}
+
 }
 
-void msg2event(string msg, PhoneEvent* phoneEvent)
+void msg2event(ptree& pt, PhoneEvent* phoneEvent)
 {
-	ptree pt, pt1, pt2;
-	double roll = 0, yaw = 0, pitch = 0;
+	ptree pt1, pt2;
+	double roll = 0, yaw = 0, pitch = 0; 
 
-	istringstream istream(msg);
-	//std::cout << line << std::endl;
-	read_json<ptree>(istream, pt);
 	int msgType = atoi(pt.get<string>("msgType").c_str());
 	//此处需要定义好统一的消息格式，然后再判断消息类型，按不同的类型解析
 	switch(msgType)
 	{
 	case NONE:
 		cout << "NONE" << endl;
-		//std::cout << pt.get<string>("x") << std::endl;
-		//std::cout << pt.get<string>("y") << std::endl;
 		break;
 	case NEWCONNECT:
 		cout << "NEWCONNECT" << endl;
@@ -192,26 +197,25 @@ void PhoneInput::updateState( osgGA::EventQueue* eventQueue )
 	//return;
 	if (!_ready || !eventQueue)
 		return;
-	cout << "updateState \n" << zfj << endl;
+	//cout << "updateState \n" << zfj << endl;
 	//读取消息队列
 
 	osg::ref_ptr<PhoneEvent> event = new PhoneEvent;
 	//组装事件
 	{
 		boost::unique_lock<boost::mutex> lock(g_mutex); 
-		while(!g_inputMsg.empty())
+		while(!m_inputMsg.empty())
 		{
-			string msg;
-			
-			msg = g_inputMsg.front();
-			g_inputMsg.pop();
-			
-			cout << "填充事件当中" << msg << endl;
+			ptree msg;
+
+			msg = m_inputMsg.front();
+			m_inputMsg.pop();
+
 			msg2event(msg, event.get());  //把string转成event
 
-			cout << event->_ps.rot._roll << endl;
-			cout << event->_ps.rot._pitch << endl;
-			cout << event->_ps.rot._yaw << endl;
+			//cout << event->_ps.rot._roll << endl;
+			//cout << event->_ps.rot._pitch << endl;
+			//cout << event->_ps.rot._yaw << endl;
 
 			eventQueue->userEvent( event.get() );
 		}
@@ -242,7 +246,29 @@ void PhoneInput::start()
 				if(line.size())
 				{
 					std::cout << line << std::endl;
-					g_inputMsg.push(line);
+					ptree pt;
+					istringstream istream(line);
+					read_json<ptree>(istream, pt);
+
+					int msgType = atoi(pt.get<string>("msgType").c_str());
+					int phoneID = atoi(pt.get<string>("phoneID").c_str());
+
+					set<int>::iterator it;       //用来查找phoneID
+
+					switch(msgType)
+					{
+					case NEWCONNECT:
+					case DISCONNECT:
+					case GIVEUPCONTROL:
+					case REQUESTCONTROL:
+						m_controlMsg.push(pt);
+						break;
+					default:
+						it = m_nsetPhoneIDs.find(phoneID);   //假如phone还没有连入的话，那些控制消息可以过滤掉
+						if(it != m_nsetPhoneIDs.end())
+							m_inputMsg.push(pt);
+					}
+
 					line.clear();
 				}
 			}
