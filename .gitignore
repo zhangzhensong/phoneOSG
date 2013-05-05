@@ -1,0 +1,7 @@
+# git ignore file
+*.ipch
+*.opensdf
+*.sdf
+*.vcxproj
+*.user
+*.filters
